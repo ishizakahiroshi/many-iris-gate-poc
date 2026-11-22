@@ -22,3 +22,7 @@ test("rejects input that is not an array", () => {
 test("adds negative numbers", () => {
   assert.equal(sum([5, -2, -3]), 0);
 });
+
+test("adds decimals", () => {
+  assert.equal(sum([0.5, 0.25]), 0.75);
+});
