@@ -1,0 +1,55 @@
+name: policy-guard
+
+# Runs from the base side and never checks out PR code. It only reads the list
+# of changed files through the API and fails when a protected path is touched,
+# so that a maintainer reviews and merges those PRs by hand.
+on:
+  pull_request_target:
+    branches: [develop]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  policy-guard:
+    name: policy-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check changed paths
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CHANGED_FILES: ${{ github.event.pull_request.changed_files }}
+        run: |
+          set -euo pipefail
+          # The files API returns at most 3000 entries; refuse to judge a
+          # longer list instead of passing on a partial one.
+          if [ "${CHANGED_FILES}" -gt 3000 ]; then
+            echo "::error::Too many changed files to check (${CHANGED_FILES}). A maintainer must review this PR."
+            exit 1
+          fi
+          gh api --paginate "repos/${REPO}/pulls/${PR_NUMBER}/files" \
+            --jq '.[] | .filename, (.previous_filename // empty)' > changed.txt
+          pattern='^\.github/|(^|/)CODEOWNERS$|(^|/)package\.json$|(^|/)(package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|yarn\.lock|bun\.lockb?)$|(^|/)\.npmrc$|(^|/)\.gitleaks\.toml$|(^|/)doxguard[^/]*$|^scripts/secrets-scan'
+          # File names come from the PR author; keep them from being read as
+          # workflow commands while printing them.
+          stop_token="$(openssl rand -hex 16)"
+          echo "::stop-commands::${stop_token}"
+          echo "changed files:"
+          cat changed.txt
+          protected=0
+          if grep -E "${pattern}" changed.txt > protected.txt; then
+            protected=1
+            echo "protected paths:"
+            cat protected.txt
+          fi
+          echo "::${stop_token}::"
+          if [ "${protected}" -eq 1 ]; then
+            echo "::error::This PR changes protected paths. A maintainer must review and merge it."
+            exit 1
+          fi
+          echo "No protected paths changed."
