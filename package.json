@@ -2,6 +2,7 @@
   "name": "many-iris-gate-poc",
   "version": "0.0.0",
   "private": true,
+  "description": "Synthetic gate PoC",
   "type": "module",
   "scripts": {
     "test": "node --test"
