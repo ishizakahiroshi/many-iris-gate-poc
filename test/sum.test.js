@@ -18,3 +18,7 @@ test("rejects values that are not finite numbers", () => {
 test("rejects input that is not an array", () => {
   assert.throws(() => sum("1,2"), TypeError);
 });
+
+test("adds negative numbers", () => {
+  assert.equal(sum([5, -2, -3]), 0);
+});
